@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/truefoundry/elasti/resolver/internal/kubecache"
 	"github.com/truefoundry/elasti/resolver/internal/prom"
 
 	"github.com/truefoundry/elasti/pkg/utils"
@@ -24,15 +25,17 @@ type HostManager struct {
 	hosts                   sync.Map
 	trafficReEnableDuration time.Duration
 	headerForHost           string
+	kubeCache               *kubecache.KubeCache
 }
 
 // NewHostManager returns a new HostManager
-func NewHostManager(logger *zap.Logger, trafficReEnableDuration time.Duration, headerForHost string) *HostManager {
+func NewHostManager(logger *zap.Logger, trafficReEnableDuration time.Duration, headerForHost string, kubeCache *kubecache.KubeCache) *HostManager {
 	return &HostManager{
 		logger:                  logger.With(zap.String("component", "hostManager")),
 		hosts:                   sync.Map{},
 		trafficReEnableDuration: trafficReEnableDuration,
 		headerForHost:           headerForHost,
+		kubeCache:               kubeCache,
 	}
 }
 
@@ -44,11 +47,22 @@ func (hm *HostManager) GetHost(req *http.Request) (*messages.Host, error) {
 	}
 	host, ok := hm.hosts.Load(incomingHost)
 	if !ok {
-		sourceService, namespace, err := hm.extractNamespaceAndService(incomingHost)
-		if err != nil {
-			prom.HostExtractionCounter.WithLabelValues("error", incomingHost, hm.headerForHost, err.Error()).Inc()
-			return &messages.Host{}, err
+		var sourceService string
+		var namespace string
+
+		if sourceServiceID, found := hm.kubeCache.GetServiceForRequest(req); found {
+			sourceService = sourceServiceID.Name
+			namespace = sourceServiceID.Namespace
+		} else {
+			var err error
+
+			sourceService, namespace, err = hm.extractNamespaceAndService(incomingHost)
+			if err != nil {
+				prom.HostExtractionCounter.WithLabelValues("error", incomingHost, hm.headerForHost, err.Error()).Inc()
+				return &messages.Host{}, err
+			}
 		}
+
 		targetService := utils.GetPrivateServiceName(sourceService)
 		sourceHost := hm.removeTrailingWildcardIfNeeded(incomingHost)
 		sourceHost = hm.removeTrailingPathIfNeeded(sourceHost)
