@@ -16,7 +16,7 @@ generate-manifest: ## Generate deploy manifest
 
 .PHONY: setup-registry
 setup-registry: ## Setup docker registry, where we publish our images
-	docker run -d -p 5001:5000 --name registry registry:2 
+	docker run -d -p 5001:5000 --name registry registry:2
 
 .PHONY: stop-registry
 stop-registry: ## Stop docker registry
@@ -46,12 +46,12 @@ test-resolver: ## Run resolver tests
 test-pkg: ## Run pkg tests
 	cd pkg && make test
 
-.PHONY: serve-docs 
+.PHONY: serve-docs
 serve-docs: ## Serve docs
 	@command -v mkdocs >/dev/null 2>&1 || { \
 	  echo "mkdocs not found - please install it (pip install mkdocs-material)"; exit 1; } ; \
 	mkdocs serve
-	
+
 .PHONY: build-docs
 build-docs: ## Build docs
 	@command -v mkdocs >/dev/null 2>&1 || { \
@@ -61,5 +61,3 @@ build-docs: ## Build docs
 .PHONY: fetch-contributors
 fetch-contributors: ## Fetch contributors
 	python3 docs/scripts/fetch_contributors.py
-
-
